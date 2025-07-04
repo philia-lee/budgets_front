@@ -20,10 +20,21 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: 'App'
-}
+<script setup>
+import { onMounted } from 'vue'
+import { useRouter } from 'vue-router' 
+import { useUserStore } from '@/stores/user'
+import axiosInstance from "@/service/axiosInstance"
+const userStore = useUserStore()
+const router = useRouter()
+onMounted(() => {
+  if (userStore.accessToken) {
+    axiosInstance.setToken(userStore.accessToken)
+  }
+  else {
+    axiosInstance.setToken(null);
+  }
+})
 </script>
 
 <style>

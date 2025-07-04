@@ -27,6 +27,7 @@ const routes = [
     path: "/",
     name: "Home",
     component: Home,
+    meta: { requiresAuth: true }
   },
   // 팀원 1: 인증 관련
   {
@@ -43,22 +44,27 @@ const routes = [
     path: "/profile",
     name: "Profile",
     component: Profile,
+    meta: { requiresAuth: true }
   },
+
   // 팀원 1: 거래 관련
   {
     path: "/transactions",
     name: "Transactions",
     component: Transactions,
+    meta: { requiresAuth: true }
   },
   {
     path: "/transactions/new",
     name: "NewTransaction",
     component: TransactionForm,
+    meta: { requiresAuth: true }
   },
   {
     path: "/transactions/:id/edit",
     name: "EditTransaction",
     component: TransactionForm,
+    meta: { requiresAuth: true }
   },
   // 팀원 1: 카테고리 관리
   // {
@@ -71,11 +77,13 @@ const routes = [
     path: "/statistics",
     name: "Statistics",
     component: Statistics,
+    meta: { requiresAuth: true }
   },
   {
     path: "/budget",
     name: "Budget",
     component: Budget,
+    meta: { requiresAuth: true }
   },
   // {
   //   path: "/notifications",
@@ -92,6 +100,7 @@ const routes = [
     path: "/groups",
     name: "Groups",
     component: Groups,
+    meta: { requiresAuth: true }
   },
   // {
   //   path: "/groups/:id",
@@ -104,10 +113,20 @@ const routes = [
   //   component: Comparison,
   // },
 ]
-
 const router = createRouter({
   history: createWebHistory(),
   routes,
+})
+router.beforeEach((to, from, next) => {
+  const userData = localStorage.getItem('user')
+  const token = userData ? JSON.parse(userData).accessToken : null
+
+  if (to.meta.requiresAuth && !token) {
+    next('/login') // 로그인 안됐으면 리디렉션
+  } else {
+    next()
+  }
+
 })
 
 export default router

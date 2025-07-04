@@ -3,11 +3,11 @@
     <div class="login-card">
       <h2 class="login-title">로그인</h2>
       
-      <form @submit.prevent="handleLogin" class="login-form">
+      <form @submit.prevent="login" class="login-form">
         <div class="form-group">
           <label class="form-label">이메일</label>
           <input 
-            v-model="form.email"
+            v-model="email"
             type="email" 
             required
             class="form-input"
@@ -18,7 +18,7 @@
         <div class="form-group">
           <label class="form-label">비밀번호</label>
           <input 
-            v-model="form.password"
+            v-model="password"
             type="password" 
             required
             class="form-input"
@@ -32,11 +32,8 @@
       </form>
       
       <div class="social-login">
-        <div class="divider">또는</div>
-        
-        <button class="social-button google">
-          Google로 로그인
-        </button>
+        <div class="divider"></div>
+
         
         <button class="social-button kakao">
           Kakao로 로그인
@@ -52,34 +49,24 @@
   </div>
 </template>
 
-<script>
+<script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import auth from '@/service/LoginAPI.js'
+const email = ref('')
+const password = ref('')
+const router = useRouter();
+const login = async () => {
+try {
+    const data = await auth.doLogin(email.value, password.value)
+    router.push('/')
+  } catch (err) {
 
-export default {
-  name: 'Login',
-  setup() {
-    const router = useRouter()
-    const form = ref({
-      email: '',
-      password: ''
-    })
-
-    const handleLogin = async () => {
-      try {
-        console.log('로그인 시도:', form.value)
-        router.push('/')
-      } catch (error) {
-        console.error('로그인 실패:', error)
-      }
-    }
-
-    return {
-      form,
-      handleLogin
-    }
+    console.error(err)
   }
+
 }
+
 </script>
 
 <style scoped>
@@ -183,7 +170,6 @@ export default {
 }
 
 .divider::after {
-  content: '또는';
   background: white;
   padding: 0 1rem;
   position: relative;

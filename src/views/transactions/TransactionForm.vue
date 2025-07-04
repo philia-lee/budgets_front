@@ -13,7 +13,7 @@
               <input 
                 v-model="form.type" 
                 type="radio" 
-                value="income"
+                value="INCOME"
                 class="radio-input"
               >
               <span class="radio-label">수입</span>
@@ -22,7 +22,7 @@
               <input 
                 v-model="form.type" 
                 type="radio" 
-                value="expense"
+                value="EXPENSE"
                 class="radio-input"
               >
               <span class="radio-label">지출</span>
@@ -48,11 +48,12 @@
             required
             class="form-select"
           >
+          <!--수정 필요-->
             <option value="">카테고리 선택</option>
-            <option value="food">식비</option>
-            <option value="transport">교통비</option>
-            <option value="entertainment">오락</option>
-            <option value="salary">급여</option>
+            <option value="1">식비</option>
+            <option value="2">교통비</option>
+            <option value="3">오락</option>
+            <option value="4">급여</option>
           </select>
         </div>
         
@@ -94,51 +95,36 @@
   </div>
 </template>
 
-<script>
+<script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-
-export default {
-  name: 'TransactionForm',
-  setup() {
-    const router = useRouter()
-    const route = useRoute()
-    
-    const isEdit = computed(() => !!route.params.id)
-    
-    const form = ref({
+import transaction from '@/service/TransactionAPI'
+const router = useRouter()
+const route = useRoute()
+const isEdit = computed(() => !!route.params.id)
+const form = ref({
       type: 'expense',
       amount: '',
       category: '',
       description: '',
       date: new Date().toISOString().split('T')[0]
     })
+async function handleSubmit() {
+  try{
+    if(isEdit.value){
 
-    const handleSubmit = async () => {
-      try {
-        if (isEdit.value) {
-          console.log('거래 수정:', form.value)
-        } else {
-          console.log('새 거래 추가:', form.value)
-        }
-        router.push('/transactions')
-      } catch (error) {
-        console.error('저장 실패:', error)
-      }
+      console.log('거래 수정:', form.value)
     }
-
-    onMounted(() => {
-      if (isEdit.value) {
-        console.log('거래 데이터 로드:', route.params.id)
-      }
-    })
-
-    return {
-      form,
-      isEdit,
-      handleSubmit
+    else //거래 추가
+    {
+      // console.log('거래 수정:', form.value)
+      await transaction.add(form.value)
+      router.push('/transactions')
     }
   }
+   catch (error) {
+        console.error('저장 실패:', error)
+      }
 }
 </script>
 
