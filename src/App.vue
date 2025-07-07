@@ -4,12 +4,19 @@
       <div class="nav-container">
         <h1 class="nav-title">가계부 앱</h1>
         <div class="nav-links">
-          <router-link to="/" class="nav-link">홈</router-link>
-          <router-link to="/transactions" class="nav-link">거래내역</router-link>
-          <router-link to="/statistics" class="nav-link">통계</router-link>
-          <router-link to="/budget" class="nav-link">예산</router-link>
-          <router-link to="/groups" class="nav-link">그룹</router-link>
-          <router-link to="/profile" class="nav-link">프로필</router-link>
+          <template v-if="userStore.accessToken">
+            <router-link to="/" class="nav-link">홈</router-link>
+            <router-link to="/transactions" class="nav-link">거래내역</router-link>
+            <router-link to="/statistics" class="nav-link">통계</router-link>
+            <router-link to="/budget" class="nav-link">예산</router-link>
+            <router-link to="/groups" class="nav-link">그룹</router-link>
+            <router-link to="/profile" class="nav-link">프로필</router-link>
+            <button @click="logout" class="nav-link logout-button">로그아웃</button>
+          </template>
+          <template v-else>
+            <router-link to="/login" class="nav-link">로그인</router-link>
+            <router-link to="/register" class="nav-link">회원가입</router-link>
+          </template>
         </div>
       </div>
     </nav>
@@ -25,15 +32,18 @@ import { onMounted } from 'vue'
 import { useRouter } from 'vue-router' 
 import { useUserStore } from '@/stores/user'
 import axiosInstance from "@/service/axiosInstance"
+
 const userStore = useUserStore()
 const router = useRouter()
+
+const logout = () => {
+  userStore.logout()
+  axiosInstance.setToken(null)
+  router.push('/login')
+}
+
 onMounted(() => {
-  if (userStore.accessToken) {
-    axiosInstance.setToken(userStore.accessToken)
-  }
-  else {
-    axiosInstance.setToken(null);
-  }
+  axiosInstance.setToken(userStore.accessToken)
 })
 </script>
 
@@ -117,5 +127,17 @@ body {
   .main-content {
     padding: 1rem;
   }
+}
+
+.logout-button {
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
+  cursor: pointer;
+}
+
+.logout-button:hover {
+  background-color: rgba(255,255,255,0.1);
 }
 </style>

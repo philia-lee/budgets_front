@@ -47,6 +47,42 @@
             placeholder="닉네임을 입력하세요"
           >
         </div>
+
+        <div class="form-group">
+          <label class="form-label">생년월일</label>
+          <input 
+            v-model="form.age"
+            type="date" 
+            required
+            class="form-input"
+          >
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">성별</label>
+          <div class="radio-group">
+            <label class="radio-option">
+              <input 
+                v-model="form.gender" 
+                type="radio" 
+                value="MALE"
+                class="radio-input"
+                required
+              >
+              <span class="radio-label">남성</span>
+            </label>
+            <label class="radio-option">
+              <input 
+                v-model="form.gender" 
+                type="radio" 
+                value="FEMALE"
+                class="radio-input"
+                required
+              >
+              <span class="radio-label">여성</span>
+            </label>
+          </div>
+        </div>
         
         <button type="submit" class="register-button">
           회원가입
@@ -65,7 +101,7 @@
 <script>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
-
+import user from '@/service/registerAPI'
 export default {
   name: 'Register',
   setup() {
@@ -74,7 +110,9 @@ export default {
       email: '',
       password: '',
       confirmPassword: '',
-      nickname: ''
+      nickname: '',
+      age: '',
+      gender: ''
     })
 
     const handleRegister = async () => {
@@ -82,13 +120,17 @@ export default {
         alert('비밀번호가 일치하지 않습니다.')
         return
       }
-
-      try {
-        console.log('회원가입 시도:', form.value)
+try {
+      const response = await user.register(form.value)
+      if(response=="success")
         router.push('/login')
-      } catch (error) {
-        console.error('회원가입 실패:', error)
-      }
+      else
+        alert(`${response}`)
+}
+ catch(err)
+ {
+  alert("에러가 발생했습니다")
+ }     
     }
 
     return {
@@ -193,5 +235,28 @@ export default {
   .register-card {
     padding: 2rem;
   }
+}
+
+.radio-group {
+  display: flex;
+  gap: 2rem;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.radio-input {
+  width: 1.2rem;
+  height: 1.2rem;
+  accent-color: #059669;
+}
+
+.radio-label {
+  font-weight: 500;
+  color: #374151;
 }
 </style>
