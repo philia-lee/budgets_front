@@ -2,55 +2,49 @@
   <div class="groups-container">
     <div class="header">
       <h2 class="page-title">그룹 가계부</h2>
-      <button 
-        @click="showCreateForm = true"
-        class="create-button"
-      >
+      <button @click="showCreateForm = true" class="create-button">
         그룹 생성
       </button>
     </div>
 
     <!-- 내 그룹 목록 -->
     <div class="groups-grid">
-      <div 
-        v-for="group in groups" 
-        :key="group.id"
+      <div
+        v-for="group in groups"
+        :key="group.groupId"
         class="group-card"
-        @click="$router.push(`/groups/${group.id}`)"
+        @click="$router.push(`/groups/${group.groupId}`)"
       >
         <div class="group-header">
           <div class="group-avatar">
-            {{ group.name.charAt(0) }}
+            {{ group.groupName.charAt(0) }}
           </div>
           <div class="group-info">
-            <h3 class="group-name">{{ group.name }}</h3>
-            <p class="group-members">{{ group.members.length }}명</p>
+            <h3 class="group-name">{{ group.groupName }}</h3>
+            <p class="group-members">{{ group.members?.length || 0 }}명</p>
           </div>
         </div>
-        
+
         <div class="group-stats">
           <div class="stat-row">
             <span class="stat-label">이번 달 총 지출</span>
-            <span class="stat-value">₩{{ group.totalExpense.toLocaleString() }}</span>
+            <span class="stat-value">₩0</span>
           </div>
           <div class="stat-row">
             <span class="stat-label">내 지출</span>
-            <span class="stat-value">₩{{ group.myExpense.toLocaleString() }}</span>
+            <span class="stat-value">₩0</span>
           </div>
         </div>
-        
+
         <div class="member-avatars">
-          <div 
-            v-for="member in group.members.slice(0, 3)" 
-            :key="member.id"
+          <div
+            v-for="member in group.members.slice(0, 3)"
+            :key="member.userId"
             class="member-avatar"
           >
-            {{ member.name.charAt(0) }}
+            {{ member.nickname.charAt(0) }}
           </div>
-          <div 
-            v-if="group.members.length > 3"
-            class="member-avatar more"
-          >
+          <div v-if="group.members.length > 3" class="member-avatar more">
             +{{ group.members.length - 3 }}
           </div>
         </div>
@@ -58,23 +52,27 @@
     </div>
 
     <!-- 그룹 생성 모달 -->
-    <div v-if="showCreateForm" class="modal-overlay" @click="showCreateForm = false">
+    <div
+      v-if="showCreateForm"
+      class="modal-overlay"
+      @click="showCreateForm = false"
+    >
       <div class="modal-content" @click.stop>
         <h3 class="modal-title">새 그룹 생성</h3>
         <form @submit.prevent="createGroup" class="group-form">
           <div class="form-group">
             <label class="form-label">그룹 이름</label>
-            <input 
-              v-model="groupForm.name" 
-              type="text" 
+            <input
+              v-model="groupForm.name"
+              type="text"
               required
               class="form-input"
               placeholder="그룹 이름을 입력하세요"
-            >
+            />
           </div>
           <div class="form-group">
             <label class="form-label">설명</label>
-            <textarea 
+            <textarea
               v-model="groupForm.description"
               class="form-textarea"
               rows="3"
@@ -83,8 +81,8 @@
           </div>
           <div class="button-group">
             <button type="submit" class="create-button-modal">생성</button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               @click="showCreateForm = false"
               class="cancel-button"
             >
@@ -97,56 +95,51 @@
   </div>
 </template>
 
-<script>
-import { ref } from 'vue'
+<script setup>
+import { ref, onMounted } from "vue";
+import groupApi from "@/service/social/Group";
 
-export default {
-  name: 'GroupList',
-  setup() {
-    const showCreateForm = ref(false)
-    const groupForm = ref({
-      name: '',
-      description: ''
-    })
+const showCreateForm = ref(false);
+const groupName = ref("");
+const groups = ref([]);
 
-    const groups = ref([
-      {
-        id: 1,
-        name: '가족 가계부',
-        totalExpense: 1500000,
-        myExpense: 750000,
-        members: [
-          { id: 1, name: '김철수' },
-          { id: 2, name: '김영희' }
-        ]
-      },
-      {
-        id: 2,
-        name: '룸메이트',
-        totalExpense: 800000,
-        myExpense: 400000,
-        members: [
-          { id: 1, name: '김철수' },
-          { id: 3, name: '박민수' },
-          { id: 4, name: '이지은' }
-        ]
-      }
-    ])
-
-    const createGroup = () => {
-      console.log('그룹 생성:', groupForm.value)
-      showCreateForm.value = false
-      groupForm.value = { name: '', description: '' }
-    }
-
-    return {
-      showCreateForm,
-      groupForm,
-      groups,
-      createGroup
-    }
+const loadGroups = async () => {
+  const myGroups = await groupApi.fetchMyGroups();
+  if (myGroups.code === 403) {
+    alert("권한이 없습니다. 다시 로그인해주세요.");
+    return;
   }
-}
+
+  const detailedGroups = await Promise.all(
+    myGroups.map(async (group) => {
+      const details = await groupApi.fetchGroupDetails(group.id);
+      return details;
+    })
+  );
+
+  console.log("내 그룹 목록:", myGroups);
+  console.log("멤버 포함 그룹 목록:", detailedGroups);
+
+  groups.value = detailedGroups;
+
+  console.log(groups.value);
+};
+
+const createGroup = async () => {
+  const result = await groupApi.createGroup(groupName.value);
+  if (result === "success") {
+    alert("그룹이 생성되었습니다.");
+    await loadGroups();
+    showCreateForm.value = false;
+    groupName.value = "";
+  } else {
+    alert(`에러: ${result}`);
+  }
+};
+
+onMounted(() => {
+  loadGroups();
+});
 </script>
 
 <style scoped>
@@ -341,7 +334,8 @@ export default {
   font-size: 0.9rem;
 }
 
-.form-input, .form-textarea {
+.form-input,
+.form-textarea {
   padding: 1rem;
   border: 2px solid #e5e7eb;
   border-radius: 8px;
@@ -350,7 +344,8 @@ export default {
   font-family: inherit;
 }
 
-.form-input:focus, .form-textarea:focus {
+.form-input:focus,
+.form-textarea:focus {
   outline: none;
   border-color: #2563eb;
 }
@@ -403,7 +398,7 @@ export default {
     gap: 1rem;
     align-items: stretch;
   }
-  
+
   .groups-grid {
     grid-template-columns: 1fr;
   }
