@@ -2,7 +2,7 @@
   <div class="groups-container">
     <div class="header">
       <h2 class="page-title">그룹 가계부</h2>
-      <button @click="showCreateForm = true" class="create-button">
+      <button @click="showCreateForm = true; console.log('showCreateForm', showCreateForm);" class="create-button">
         그룹 생성
       </button>
     </div>
@@ -28,11 +28,11 @@
         <div class="group-stats">
           <div class="stat-row">
             <span class="stat-label">이번 달 총 지출</span>
-            <span class="stat-value">₩0</span>
+            <span class="stat-value">₩{{ Number(group.totalExpense).toLocaleString() }}</span>
           </div>
           <div class="stat-row">
             <span class="stat-label">내 지출</span>
-            <span class="stat-value">₩0</span>
+            <span class="stat-value">₩{{ Number(group.myExpense).toLocaleString() }}</span>
           </div>
         </div>
 
@@ -63,21 +63,12 @@
           <div class="form-group">
             <label class="form-label">그룹 이름</label>
             <input
-              v-model="groupForm.name"
+              v-model="groupName"
               type="text"
               required
               class="form-input"
               placeholder="그룹 이름을 입력하세요"
             />
-          </div>
-          <div class="form-group">
-            <label class="form-label">설명</label>
-            <textarea
-              v-model="groupForm.description"
-              class="form-textarea"
-              rows="3"
-              placeholder="그룹 설명을 입력하세요"
-            ></textarea>
           </div>
           <div class="button-group">
             <button type="submit" class="create-button-modal">생성</button>
@@ -98,6 +89,7 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import groupApi from "@/service/social/Group";
+import groupTransactionApi from "@/service/social/GroupTransaction";
 
 const showCreateForm = ref(false);
 const groupName = ref("");
@@ -113,6 +105,13 @@ const loadGroups = async () => {
   const detailedGroups = await Promise.all(
     myGroups.map(async (group) => {
       const details = await groupApi.fetchGroupDetails(group.id);
+
+      // 요약 데이터도 함께 요청
+      const summary = await groupTransactionApi.fetchMonthlySummary(group.id);
+      console.log(summary)
+      details.totalExpense = summary?.totalExpense ?? 0;
+      details.myExpense = summary?.myExpense ?? 0;
+
       return details;
     })
   );
@@ -121,8 +120,6 @@ const loadGroups = async () => {
   console.log("멤버 포함 그룹 목록:", detailedGroups);
 
   groups.value = detailedGroups;
-
-  console.log(groups.value);
 };
 
 const createGroup = async () => {

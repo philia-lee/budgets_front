@@ -96,4 +96,15 @@ export default {
       return [];
     }
   },
+
+  // 이번달 요약
+  async fetchMonthlySummary(groupId) {
+    try {
+      const response = await axiosInstance.get(`/api/groups/${groupId}/transactions/summary`);
+      return response.data;
+    } catch (err) {
+      console.error(err.response?.data?.message);
+      return null;
+    }
+  },
 };
