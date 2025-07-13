@@ -2,7 +2,7 @@
   <div class="budget-container">
     <div class="header">
       <h2 class="page-title">예산 관리</h2>
-      <button @click="showBudgetForm = true" class="add-button">예산 설정</button>
+      <button @click="openBudgetForm" class="add-button">예산 설정</button>
     </div>
 
     <div class="budget-card">
@@ -42,27 +42,36 @@
     </div>
 
     <!-- 예산 상세 모달 -->
-    <div v-if="selectedBudget" class="modal-overlay" @click="selectedBudget = null">
+    <div v-if="selectedBudget" class="modal-overlay" @click="closeDetail">
       <div class="modal-content" @click.stop>
         <h3 class="modal-title">예산 상세 정보</h3>
         <div class="detail-row"><b>카테고리:</b> {{ getCategoryName(selectedBudget.category_id) }}</div>
         <div class="detail-row"><b>예산 금액:</b> ₩{{ selectedBudget.amount?.toLocaleString() ?? '0' }}</div>
         <div class="detail-row"><b>사용 금액:</b> ₩{{ selectedBudget.used_amount?.toLocaleString() ?? '0' }}</div>
         <div class="detail-row"><b>기간:</b> {{ selectedBudget.start_date }} ~ {{ selectedBudget.end_date }}</div>
-        <button class="cancel-button" @click="selectedBudget = null" style="margin-top:2rem;">닫기</button>
+        <div style="margin-top:2rem; display:flex; gap:1rem;">
+          <button class="cancel-button" @click="closeDetail">닫기</button>
+          <button class="edit-button" @click="editBudget(selectedBudget)">수정</button>
+          <button class="delete-button" @click="deleteBudget(selectedBudget)">삭제</button>
+        </div>
       </div>
     </div>
 
-    <!-- 예산 설정 모달 -->
-    <div v-if="showBudgetForm" class="modal-overlay" @click="showBudgetForm = false">
+    <!-- 예산 설정/수정 모달 -->
+    <div v-if="showBudgetForm" class="modal-overlay" @click="closeBudgetForm">
       <div class="modal-content" @click.stop>
-        <h3 class="modal-title">예산 설정</h3>
+        <h3 class="modal-title">{{ isEditMode ? '예산 수정' : '예산 설정' }}</h3>
         <form @submit.prevent="saveBudget" class="budget-form">
           <div class="form-group">
             <label class="form-label">카테고리</label>
-            <select v-model.number="budgetForm.category_id" required class="form-select">
+            <select v-model.number="budgetForm.category_id" required class="form-select" :disabled="isEditMode">
               <option disabled value="">카테고리 선택</option>
-              <option v-for="(name, id) in CATEGORY_MAP" :key="id" :value="Number(id)">
+              <option
+                v-for="(name, id) in CATEGORY_MAP"
+                :key="id"
+                :value="Number(id)"
+                :disabled="!isEditMode && isCategoryDisabled(Number(id))"
+              >
                 {{ name }}
               </option>
             </select>
@@ -84,6 +93,7 @@
               type="date"
               required
               class="form-input"
+              :readonly="true"
             />
           </div>
           <div class="form-group">
@@ -93,11 +103,12 @@
               type="date"
               required
               class="form-input"
+              :readonly="true"
             />
           </div>
           <div class="button-group">
-            <button type="submit" class="save-button">저장</button>
-            <button type="button" @click="showBudgetForm = false" class="cancel-button">취소</button>
+            <button type="submit" class="save-button">{{ isEditMode ? '수정' : '저장' }}</button>
+            <button type="button" @click="closeBudgetForm" class="cancel-button">취소</button>
           </div>
         </form>
       </div>
@@ -118,19 +129,40 @@ const CATEGORY_MAP = {
   6: '기타'
 }
 
+function getThisMonthRange() {
+  const today = new Date()
+  const year = today.getFullYear()
+  const month = today.getMonth() + 1
+  const start = `${year}-${String(month).padStart(2, '0')}-01`
+  const endDate = new Date(year, month, 0)
+  const end = `${year}-${String(month).padStart(2, '0')}-${String(endDate.getDate()).padStart(2, '0')}`
+  return { start, end }
+}
+
 export default {
   name: 'Budget',
   setup() {
     const showBudgetForm = ref(false)
+    const isEditMode = ref(false)
+    const budgets = ref([])
+    const selectedBudget = ref(null)
+    const editingBudgetId = ref(null)
+
+    const { start, end } = getThisMonthRange()
     const budgetForm = ref({
       category_id: '',
       amount: '',
-      startDate: '',
-      endDate: ''
+      startDate: start,
+      endDate: end
     })
 
-    const budgets = ref([])
-    const selectedBudget = ref(null)
+    const isCategoryDisabled = (categoryId) => {
+      return budgets.value.some(
+        b => b.category_id === categoryId &&
+          b.start_date === start &&
+          b.end_date === end
+      )
+    }
 
     const getCategoryName = (category_id) => {
       return CATEGORY_MAP[category_id] || `카테고리 ${category_id}`
@@ -142,56 +174,108 @@ export default {
       return 'safe'
     }
 
-    // 예산 목록 불러오기 (거래 내역 합산 used_amount 포함)
     const getBudgets = async () => {
       try {
         const response = await axiosInstance.get('/api/budget')
         const data = Array.isArray(response.data) ? response.data : []
-        budgets.value = data.map(budget => {
-          const used = budget.used_amount || 0
-          const limit = budget.amount || 1
-          return {
-            ...budget,
-            percentage: (used / limit) * 100
-          }
-        })
+        budgets.value = data
+          .filter(b =>
+            b.start_date === start && b.end_date === end
+          )
+          .map(budget => {
+            const used = budget.used_amount || 0
+            const limit = budget.amount || 1
+            return {
+              ...budget,
+              percentage: (used / limit) * 100
+            }
+          })
       } catch (err) {
         console.error('예산 목록 불러오기 실패:', err)
       }
     }
 
-    // 예산 저장 후 바로 목록 갱신
     const saveBudget = async () => {
       try {
-        await axiosInstance.post('/api/budget', {
-          category_id: budgetForm.value.category_id,
-          amount: budgetForm.value.amount,
-          startDate: budgetForm.value.startDate,
-          endDate: budgetForm.value.endDate
-        })
-        await getBudgets()
-        showBudgetForm.value = false
-        budgetForm.value = {
-          category_id: '',
-          amount: '',
-          startDate: '',
-          endDate: ''
+        if (isEditMode.value) {
+          await axiosInstance.patch(`/api/budget/${editingBudgetId.value}`, {
+            category_id: budgetForm.value.category_id,
+            amount: budgetForm.value.amount,
+            startDate: budgetForm.value.startDate,
+            endDate: budgetForm.value.endDate
+          })
+        } else {
+          await axiosInstance.post('/api/budget', {
+            category_id: budgetForm.value.category_id,
+            amount: budgetForm.value.amount,
+            startDate: budgetForm.value.startDate,
+            endDate: budgetForm.value.endDate
+          })
         }
+        await getBudgets()
+        closeBudgetForm()
       } catch (err) {
+        alert('예산 저장 실패: 이미 해당 카테고리의 이번달 예산이 존재하거나 서버 오류입니다.')
         console.error('예산 저장 실패:', err)
       }
     }
 
-    // 예산 상세 모달 띄우기
+    const deleteBudget = async (budget) => {
+      if (!confirm('정말 삭제하시겠습니까?')) return
+      try {
+        await axiosInstance.delete(`/api/budget/${budget.id}`)
+        selectedBudget.value = null
+        await getBudgets()
+      } catch (err) {
+        alert('예산 삭제 실패')
+      }
+    }
+
     const showDetail = (budget) => {
       selectedBudget.value = budget
     }
+    const closeDetail = () => {
+      selectedBudget.value = null
+    }
 
-    // 거래 내역 등록/수정 후 예산 자동 갱신을 위해, 
-    // transactions 페이지에서 거래 추가/수정 후 이 페이지로 돌아올 때마다 목록을 새로고침
+    const editBudget = (budget) => {
+      isEditMode.value = true
+      editingBudgetId.value = budget.id
+      budgetForm.value = {
+        category_id: budget.category_id,
+        amount: budget.amount,
+        startDate: budget.start_date,
+        endDate: budget.end_date
+      }
+      showBudgetForm.value = true
+      selectedBudget.value = null
+    }
+
+    const openBudgetForm = () => {
+      isEditMode.value = false
+      editingBudgetId.value = null
+      budgetForm.value = {
+        category_id: '',
+        amount: '',
+        startDate: start,
+        endDate: end
+      }
+      showBudgetForm.value = true
+    }
+    const closeBudgetForm = () => {
+      showBudgetForm.value = false
+      isEditMode.value = false
+      editingBudgetId.value = null
+      budgetForm.value = {
+        category_id: '',
+        amount: '',
+        startDate: start,
+        endDate: end
+      }
+    }
+
     onMounted(() => {
       getBudgets()
-      // 아래 코드는 라우터 네비게이션 후에도 예산 목록을 새로고침함
       if (window && window.addEventListener) {
         window.addEventListener('focus', getBudgets)
       }
@@ -206,13 +290,21 @@ export default {
       getCategoryName,
       selectedBudget,
       showDetail,
-      CATEGORY_MAP
+      closeDetail,
+      CATEGORY_MAP,
+      isEditMode,
+      editBudget,
+      deleteBudget,
+      isCategoryDisabled,
+      openBudgetForm,
+      closeBudgetForm
     }
   }
 }
 </script>
 
 <style scoped>
+/* 기존 스타일 그대로 유지 */
 .budget-container {
   display: flex;
   flex-direction: column;
@@ -412,6 +504,32 @@ export default {
 }
 .cancel-button:hover {
   background: #4b5563;
+}
+.edit-button {
+  background: #2563eb;
+  color: white;
+  padding: 0.7rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 0.5rem;
+}
+.edit-button:hover {
+  background: #1741a6;
+}
+.delete-button {
+  background: #dc2626;
+  color: white;
+  padding: 0.7rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 0.5rem;
+}
+.delete-button:hover {
+  background: #b91c1c;
 }
 .detail-row {
   margin-bottom: 0.8rem;

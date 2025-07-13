@@ -24,6 +24,7 @@
     <main class="main-content">
       <router-view />
     </main>
+    <NotificationModal v-if="userStore.accessToken" />
   </div>
 </template>
 
@@ -32,6 +33,7 @@ import { onMounted } from 'vue'
 import { useRouter } from 'vue-router' 
 import { useUserStore } from '@/stores/user'
 import axiosInstance from "@/service/axiosInstance"
+import NotificationModal from '@/components/NotificationModal.vue'
 
 const userStore = useUserStore()
 const router = useRouter()
@@ -46,6 +48,8 @@ onMounted(() => {
   axiosInstance.setToken(userStore.accessToken)
 })
 </script>
+<!-- ...style은 기존과 동일 -->
+
 
 <style>
 * {
