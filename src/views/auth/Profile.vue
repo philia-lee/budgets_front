@@ -2,7 +2,7 @@
   <div class="profile-container">
     <div class="profile-header">
       <h2 class="page-title">마이페이지</h2>
-      <button 
+      <button
         v-if="!isEditing"
         @click="startEdit"
         class="edit-button"
@@ -12,7 +12,6 @@
     </div>
 
     <div class="profile-grid">
-      <!-- 프로필 정보 -->
       <div class="profile-card">
         <div class="card-header">
           <h3 class="card-title">프로필 정보</h3>
@@ -23,28 +22,16 @@
         </div>
 
         <div class="profile-content">
-          <!-- 프로필 사진 -->
-          <div class="avatar-section">
-            <div class="avatar-container">
-              <div class="avatar">
-                {{ profileData.name.charAt(0) }}
-              </div>
-              <button v-if="isEditing" class="avatar-edit-button">
-                📷
-              </button>
-            </div>
-            <div class="user-info">
-              <h3 class="user-name">{{ profileData.name }}</h3>
-              <p class="user-email">{{ profileData.email }}</p>
-              <div class="join-date">{{ profileData.joinDate }} 가입</div>
-            </div>
+          <div class="user-info">
+            <h3 class="user-name">{{ profileData.name }}</h3>
+            <p class="user-email">{{ profileData.email }}</p>
+            <div class="join-date">{{ profileData.joinDate }} 가입</div>
           </div>
 
-          <!-- 기본 정보 -->
           <div class="info-grid">
             <div class="info-group">
               <label class="info-label">이름</label>
-              <input 
+              <input
                 v-if="isEditing"
                 v-model="editData.name"
                 class="info-input"
@@ -54,46 +41,45 @@
 
             <div class="info-group">
               <label class="info-label">이메일</label>
-              <input 
+              <input
                 v-if="isEditing"
                 v-model="editData.email"
                 type="email"
                 class="info-input"
+                disabled
               >
               <p v-else class="info-value">{{ profileData.email }}</p>
             </div>
 
             <div class="info-group">
-              <label class="info-label">전화번호</label>
-              <input 
+              <label class="info-label">성별</label>
+              <select
                 v-if="isEditing"
-                v-model="editData.phone"
+                v-model="editData.gender"
                 class="info-input"
               >
-              <p v-else class="info-value">{{ profileData.phone }}</p>
+                <option value="MALE">남자</option>
+                <option value="FEMALE">여자</option>
+              </select>
+              <p v-else class="info-value">{{ getGenderText(profileData.gender) }}</p>
             </div>
 
             <div class="info-group">
-              <label class="info-label">연령대</label>
-              <select 
+              <label class="info-label">생년월일</label>
+              <input
                 v-if="isEditing"
-                v-model="editData.age"
-                class="info-select"
+                v-model="editData.birthdate"
+                type="date"
+                class="info-input"
               >
-                <option value="20s">20대</option>
-                <option value="30s">30대</option>
-                <option value="40s">40대</option>
-                <option value="50s">50대</option>
-              </select>
               <p v-else class="info-value">
-                {{ getAgeText(profileData.age) }}
+                {{ profileData.birthdate }} ({{ getAgeText(profileData.birthdate) }})
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 통계 정보 -->
       <div class="stats-card">
         <h3 class="card-title">나의 통계</h3>
         <div class="stats-list">
@@ -104,7 +90,6 @@
         </div>
       </div>
 
-      <!-- 계정 설정 -->
       <div class="settings-card">
         <h3 class="card-title">계정 설정</h3>
         <div class="settings-list">
@@ -119,70 +104,102 @@
   </div>
 </template>
 
-<script>
-import { ref } from 'vue'
+<script setup>
+import { ref, onMounted } from 'vue';
+import profile from '@/service/profileAPI'; // profileAPI 경로 확인 및 수정 필요
+import axios from 'axios'; // Axios 임포트 추가
 
-export default {
-  name: 'Profile',
-  setup() {
-    const isEditing = ref(false)
-    const profileData = ref({
-      name: '김철수',
-      email: 'kimcs@example.com',
-      phone: '010-1234-5678',
-      age: '20s',
-      joinDate: '2024-01-01',
-    })
-    const editData = ref({ ...profileData.value })
+const isEditing = ref(false);
+const profileData = ref({
+  name: '',
+  email: '',
+  gender: '',
+  birthdate: '',
+  joinDate: '',
+});
+const editData = ref({});
 
-    const stats = ref([
-      { label: '총 거래 수', value: '156건' },
-      { label: '이번 달 지출', value: '2,800,000원' },
-      { label: '평균 일일 지출', value: '93,333원' },
-      { label: '가장 많이 쓴 카테고리', value: '식비' },
-    ])
+const stats = ref([
+  { label: '총 거래 수', value: '156건' },
+  { label: '이번 달 지출', value: '2,800,000원' },
+  { label: '평균 일일 지출', value: '93,333원' },
+  { label: '가장 많이 쓴 카테고리', value: '식비' },
+]);
 
-    const getAgeText = (age) => {
-      const ageMap = {
-        '20s': '20대',
-        '30s': '30대',
-        '40s': '40대',
-        '50s': '50대'
-      }
-      return ageMap[age] || age
-    }
+const getAgeText = (birthdateString) => {
+  if (!birthdateString) return '미상';
+  const birthYear = new Date(birthdateString).getFullYear();
+  const currentYear = new Date().getFullYear();
+  const age = currentYear - birthYear + 1;
 
-    const startEdit = () => {
-      isEditing.value = true
-      editData.value = { ...profileData.value }
-    }
+  if (age >= 20 && age < 30) return '20대';
+  if (age >= 30 && age < 40) return '30대';
+  if (age >= 40 && age < 50) return '40대';
+  if (age >= 50) return '50대 이상';
+  return '10대 이하';
+};
 
-    const saveProfile = () => {
-      profileData.value = { ...editData.value }
-      isEditing.value = false
-      alert('프로필이 업데이트되었습니다.')
-    }
+const getGenderText = (gender) => {
+  if (gender === 'MALE') return '남자';
+  if (gender === 'FEMALE') return '여자';
+  return '미상';
+};
 
-    const cancelEdit = () => {
-      editData.value = { ...profileData.value }
-      isEditing.value = false
-    }
+const startEdit = () => {
+  isEditing.value = true;
+  editData.value = { ...profileData.value };
+};
 
-    return {
-      isEditing,
-      profileData,
-      editData,
-      stats,
-      getAgeText,
-      startEdit,
-      saveProfile,
-      cancelEdit
-    }
+const saveProfile = async () => {
+  try {
+    
+    const response = await profile.update(editData.value);
+    console.log('프로필 업데이트 성공:', response);
+    profileData.value = { ...editData.value };
+    isEditing.value = false;
+    alert('프로필이 업데이트되었습니다.');
+    
+  } catch (error) {
+    console.log(error)
+    alert(`${error.data.message}`);
   }
-}
+};
+
+const cancelEdit = () => {
+  editData.value = { ...profileData.value };
+  isEditing.value = false;
+};
+
+onMounted(async () => {
+  try {
+    const response = await profile.show();
+    console.log('프로필 데이터 로드:', response);
+
+    // API 응답 구조에 따라 profileData.value를 업데이트합니다.
+    profileData.value = {
+      name: response.nickname || '홍길동',
+      email: response.email || 'hong@example.com',
+      gender: response.gender || '',
+      birthdate: response.birthdate || '',
+      joinDate: response.created_at ? new Date(response.created_at).toLocaleDateString('ko-KR') : '날짜 미상',
+    };
+    editData.value = { ...profileData.value };
+  } catch (error) {
+    console.error('프로필 데이터 로드 실패:', error);
+    profileData.value = {
+      name: '불러오기 실패',
+      email: 'error@example.com',
+      gender: '',
+      birthdate: '',
+      joinDate: '날짜 미상',
+    };
+    editData.value = { ...profileData.value };
+  }
+});
 </script>
 
 <style scoped>
+/* Style 태그 내용은 이전과 동일합니다. */
 .profile-container {
   display: flex;
   flex-direction: column;
@@ -277,50 +294,10 @@ export default {
   background: #4b5563;
 }
 
-.avatar-section {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-  margin-bottom: 2rem;
-  padding-bottom: 2rem;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-.avatar-container {
-  position: relative;
-}
-
-.avatar {
-  width: 5rem;
-  height: 5rem;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-size: 2rem;
-  font-weight: bold;
-}
-
-.avatar-edit-button {
-  position: absolute;
-  bottom: -0.25rem;
-  right: -0.25rem;
-  width: 2rem;
-  height: 2rem;
-  background: white;
-  border: 2px solid #e5e7eb;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 0.8rem;
-}
-
 .user-info {
-  flex: 1;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .user-name {
@@ -457,12 +434,7 @@ export default {
     gap: 1rem;
     align-items: stretch;
   }
-  
-  .avatar-section {
-    flex-direction: column;
-    text-align: center;
-  }
-  
+
   .info-grid {
     grid-template-columns: 1fr;
   }
