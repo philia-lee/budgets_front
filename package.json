@@ -12,6 +12,7 @@
     "@tosspayments/tosspayments-sdk": "^2.3.5",
     "@vueuse/core": "^13.2.0",
     "axios": "^1.10.0",
+    "chart.js": "^4.5.0",
     "js-base64": "^3.7.7",
     "pinia": "^3.0.1",
     "pinia-plugin-persistedstate": "^4.4.1",

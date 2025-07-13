@@ -142,7 +142,7 @@ export default {
       return 'safe'
     }
 
-    // 예산 목록 불러오기
+    // 예산 목록 불러오기 (거래 내역 합산 used_amount 포함)
     const getBudgets = async () => {
       try {
         const response = await axiosInstance.get('/api/budget')
@@ -187,8 +187,14 @@ export default {
       selectedBudget.value = budget
     }
 
+    // 거래 내역 등록/수정 후 예산 자동 갱신을 위해, 
+    // transactions 페이지에서 거래 추가/수정 후 이 페이지로 돌아올 때마다 목록을 새로고침
     onMounted(() => {
       getBudgets()
+      // 아래 코드는 라우터 네비게이션 후에도 예산 목록을 새로고침함
+      if (window && window.addEventListener) {
+        window.addEventListener('focus', getBudgets)
+      }
     })
 
     return {
@@ -207,7 +213,6 @@ export default {
 </script>
 
 <style scoped>
-/* 기존 스타일 그대로 사용 */
 .budget-container {
   display: flex;
   flex-direction: column;
