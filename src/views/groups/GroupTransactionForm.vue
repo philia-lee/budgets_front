@@ -43,13 +43,11 @@
 
         <div class="form-group">
           <label class="form-label">카테고리</label>
-          <select v-model="form.category" required class="form-select">
-            <!--수정 필요-->
+          <select v-model.number="form.categoryId" required class="form-select">
             <option value="">카테고리 선택</option>
-            <option value="1">식비</option>
-            <option value="2">교통비</option>
-            <option value="3">오락</option>
-            <option value="4">급여</option>
+            <option v-for="cat in categories" :key="cat.id" :value="cat.id">
+              {{ cat.name }}
+            </option>
           </select>
         </div>
 
@@ -64,7 +62,7 @@
           />
         </div>
 
-        <div class="form-group">
+        <div class="form-group" v-if="isEdit">
           <label class="form-label">날짜</label>
           <input v-model="form.date" type="date" required class="form-input" />
         </div>
@@ -85,31 +83,111 @@
 <script setup>
 import { ref, computed, onMounted } from "vue";
 import { useRouter, useRoute } from "vue-router";
-import transaction from "@/service/TransactionAPI";
+import { watch } from "vue";
+import GroupTransaction from "@/service/social/GroupTransaction";
+
 const router = useRouter();
 const route = useRoute();
-const isEdit = computed(() => !!route.params.id);
+
+const groupId = route.params.groupId;
+
+const transactionId = route.params.transactionId;
+const isEdit = computed(() => !!transactionId);
+
 const form = ref({
-  type: "expense",
+  type: "INCOME",
   amount: "",
-  category: "",
+  categoryId: "",
   description: "",
   date: new Date().toISOString().split("T")[0],
 });
+
+const categories = ref([]);
+
+const loadingCategories = ref(true);
+
+const fetchCategories = async () => {
+  loadingCategories.value = true;
+  try {
+    const data = await GroupTransaction.getCategories();
+    categories.value = data;
+  } catch (err) {
+    alert("카테고리 불러오기 실패");
+  } finally {
+    loadingCategories.value = false;
+  }
+};
+
 async function handleSubmit() {
   try {
     if (isEdit.value) {
       console.log("거래 수정:", form.value);
-    } //거래 추가
-    else {
-      // console.log('거래 수정:', form.value)
-      await transaction.add(form.value);
-      router.push("/transactions");
+
+      const payload = {
+        ...form.value,
+        amount: Number(form.value.amount),
+        categoryId: Number(form.value.categoryId),
+      };
+
+      const result = await GroupTransaction.updateTransaction(
+        groupId,
+        transactionId,
+        payload
+      );
+
+      if (result === "success" || result.includes("successfully")) {
+        alert("거래가 수정되었습니다.");
+        router.replace(`/groups/${groupId}`);
+      } else {
+        alert("거래 수정 실패: " + result);
+      }
+    } else {
+      const payload = {
+        ...form.value,
+        amount: Number(form.value.amount),
+        categoryId: Number(form.value.categoryId),
+      };
+
+      console.log("payload:", payload);
+
+      const result = await GroupTransaction.createTransaction(groupId, payload);
+
+      if (result === "success" || result.includes("successfully")) {
+        console.log(form.value.categoryId);
+        alert("거래가 추가되었습니다.");
+        router.replace(`/groups/${groupId}`);
+      } else {
+        alert("거래 추가 실패: " + result);
+      }
     }
   } catch (error) {
     console.error("저장 실패:", error);
+    alert("서버 오류가 발생했습니다.");
   }
 }
+
+const fetchTransaction = async () => {
+  if (!isEdit.value) return;
+
+  try {
+    const data = await GroupTransaction.fetchOne(groupId, transactionId);
+    form.value = {
+      type: data.type,
+      amount: data.amount,
+      categoryId: data.categoryId,
+      description: data.description,
+      date: data.date.split("T")[0], // yyyy-MM-dd
+    };
+  } catch (err) {
+    alert("거래 정보를 불러오지 못했습니다.");
+    router.go(-1);
+  }
+};
+
+onMounted(async () => {
+  await fetchCategories();
+  await fetchTransaction();
+});
 </script>
 
 <style scoped>

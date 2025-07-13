@@ -2,7 +2,10 @@
   <div class="transactions-container">
     <div class="header">
       <h2 class="page-title">그룹 내 거래 내역</h2>
-      <router-link to="/transactions/new" class="add-button">
+      <router-link
+        :to="{ name: 'GroupTransactionCreate', params: { groupId } }"
+        class="add-button"
+      >
         새 거래 추가
       </router-link>
     </div>
@@ -18,15 +21,14 @@
 
         <select v-model="filter.type" class="filter-select">
           <option value="all">전체</option>
-          <option value="income">수입</option>
-          <option value="expense">지출</option>
+          <option value="INCOME">수입</option>
+          <option value="EXPENSE">지출</option>
         </select>
 
         <select v-model="filter.category" class="filter-select">
-          <option value="all">모든 카테고리</option>
-          <option value="food">식비</option>
-          <option value="transport">교통비</option>
-          <option value="entertainment">오락</option>
+          <option v-for="cat in categories" :key="cat.id" :value="cat.name">
+            {{ cat.name === "all" ? "모든 카테고리" : cat.name }}
+          </option>
         </select>
       </div>
     </div>
@@ -34,30 +36,31 @@
     <div class="transactions-card">
       <div
         v-for="transaction in filteredTransactions"
-        :key="transaction.id"
+        :key="transaction.transactionId"
         class="transaction-item"
       >
         <div class="transaction-info">
           <div class="transaction-desc">{{ transaction.description }}</div>
           <div class="transaction-meta">
-            {{ transaction.category }} • {{ transaction.date }}
+            {{ getCategoryName(transaction.categoryId) }} •
+            {{ transaction.date }}
           </div>
         </div>
         <div class="transaction-actions">
-          <div :class="['transaction-amount', transaction.type]">
-            {{ transaction.type === "income" ? "+" : "-" }}₩{{
-              transaction.amount.toLocaleString()
+          <div :class="['transaction-amount', transaction.type.toLowerCase()]">
+            {{ transaction.type === "INCOME" ? "+ " : "- " }}₩{{
+              Number(transaction.amount).toLocaleString()
             }}
           </div>
           <div class="action-buttons">
             <button
-              @click="editTransaction(transaction.id)"
+              @click="editTransaction(transaction.transactionId)"
               class="action-button edit"
             >
               수정
             </button>
             <button
-              @click="deleteTransaction(transaction.id)"
+              @click="deleteTransaction(transaction.transactionId)"
               class="action-button delete"
             >
               삭제
@@ -66,17 +69,43 @@
         </div>
       </div>
     </div>
+
+    <div class="summary-container">
+      <div class="summary-card income">
+        <h3>총 수입</h3>
+        <p>₩{{ totalIncome.toLocaleString() }}</p>
+      </div>
+      <div class="summary-card expense">
+        <h3>총 지출</h3>
+        <p>₩{{ totalExpense.toLocaleString() }}</p>
+      </div>
+      <div class="summary-card net">
+        <h3>합계</h3>
+        <p>₩{{ (netTotal || 0).toLocaleString() }}</p>
+        <small>1인당: ₩{{ (perPerson || 0).toLocaleString() }}</small>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
-import { ref, computed } from "vue";
-import { useRouter } from "vue-router";
+import { ref, computed, onMounted } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import GroupTransaction from "@/service/social/GroupTransaction";
+import groupApi from "@/service/social/Group";
 
 export default {
   name: "TransactionList",
   setup() {
     const router = useRouter();
+    const route = useRoute();
+
+    const groupId = route.params.groupId;
+    const members = ref([]);
+
+    const loading = ref(false);
+    const transactions = ref([]);
+    const categories = ref([]);
 
     const filter = ref({
       period: "all",
@@ -84,54 +113,122 @@ export default {
       category: "all",
     });
 
-    const transactions = ref([
-      {
-        id: 1,
-        description: "급여",
-        amount: 2500000,
-        type: "income",
-        category: "급여",
-        date: "2024-01-15",
-      },
-      {
-        id: 2,
-        description: "커피",
-        amount: 4500,
-        type: "expense",
-        category: "식비",
-        date: "2024-01-14",
-      },
-      {
-        id: 3,
-        description: "지하철",
-        amount: 1500,
-        type: "expense",
-        category: "교통비",
-        date: "2024-01-14",
-      },
-    ]);
+    const fetchTransactions = async () => {
+      loading.value = true;
+      const data = await GroupTransaction.fetchAll(groupId);
+      transactions.value = data;
+      loading.value = false;
+    };
+
+    const fetchCategories = async () => {
+      try {
+        const data = await GroupTransaction.getCategories();
+        categories.value = [
+          { id: 0, name: "all" }, // 모든 카테고리
+          ...data,
+        ];
+      } catch (err) {
+        alert("카테고리 불러오기 실패");
+      }
+    };
+
+    const getCategoryName = (categoryId) => {
+      const category = categories.value.find((cat) => cat.id === categoryId);
+      return category
+        ? category.name === "all"
+          ? "모든 카테고리"
+          : category.name
+        : "알수없음";
+    };
 
     const filteredTransactions = computed(() => {
       return transactions.value.filter((transaction) => {
-        if (
-          filter.value.type !== "all" &&
-          transaction.type !== filter.value.type
-        ) {
+        const { type, category, period } = filter.value;
+
+        // type
+        if (type !== "all" && transaction.type !== type) {
           return false;
         }
+
+        // category
+        const categoryName = getCategoryName(transaction.categoryId);
+        if (category !== "all" && categoryName !== category) {
+          return false;
+        }
+
+        // period
+        const today = new Date();
+        const date = new Date(transaction.date);
+
+        if (period === "today") {
+          if (date.toDateString() !== today.toDateString()) return false;
+        } else if (period === "week") {
+          const startOfWeek = new Date(today);
+          startOfWeek.setDate(today.getDate() - today.getDay());
+          if (date < startOfWeek) return false;
+        } else if (period === "month") {
+          if (
+            date.getMonth() !== today.getMonth() ||
+            date.getFullYear() !== today.getFullYear()
+          )
+            return false;
+        }
+
         return true;
       });
     });
 
     const editTransaction = (id) => {
-      router.push(`/transactions/${id}/edit`);
+      router.push(`/groups/${groupId}/transactions/${id}/edit`);
     };
 
-    const deleteTransaction = (id) => {
+    const deleteTransaction = async (id) => {
       if (confirm("정말 삭제하시겠습니까?")) {
-        transactions.value = transactions.value.filter((t) => t.id !== id);
+        const result = await GroupTransaction.deleteTransaction(groupId, id);
+        if (result === "success") {
+          transactions.value = transactions.value.filter(
+            (t) => t.transactionId !== id
+          );
+        } else {
+          alert("삭제에 실패했습니다: " + result);
+        }
       }
     };
+
+    const totalIncome = computed(() => {
+      return filteredTransactions.value
+        .filter((t) => t.type === "INCOME")
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+    });
+
+    const totalExpense = computed(() => {
+      return filteredTransactions.value
+        .filter((t) => t.type === "EXPENSE")
+        .reduce((sum, t) => sum + Number(t.amount), 0);
+    });
+
+    const netTotal = computed(() => totalIncome.value - totalExpense.value);
+
+    const fetchGroupMembers = async () => {
+      try {
+        const groupDetails = await groupApi.fetchGroupDetails(groupId);
+        members.value = groupDetails.members || [];
+      } catch (err) {
+        alert("그룹 멤버 불러오기 실패");
+      }
+    };
+
+    // 1인당 금액 계산
+    const perPerson = computed(() => {
+      const count = members.value.length || 1;
+      return Math.floor(netTotal.value / count);
+    });
+
+    onMounted(() => {
+      fetchCategories();
+      fetchTransactions();
+      fetchGroupMembers();
+    });
 
     return {
       filter,
@@ -139,6 +236,14 @@ export default {
       filteredTransactions,
       editTransaction,
       deleteTransaction,
+      loading,
+      categories,
+      getCategoryName,
+      totalIncome,
+      totalExpense,
+      netTotal,
+      perPerson,
+      members,
     };
   },
 };
@@ -321,5 +426,45 @@ export default {
     justify-content: space-between;
     align-items: center;
   }
+}
+
+.summary-container {
+  display: flex;
+  justify-content: space-around;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.summary-card {
+  flex: 1;
+  text-align: center;
+  padding: 1rem;
+  border-radius: 8px;
+  color: #fff;
+  font-weight: bold;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.summary-card h3 {
+  margin: 0;
+  font-size: 1rem;
+  opacity: 0.8;
+}
+
+.summary-card p {
+  margin: 0.5rem 0 0;
+  font-size: 1.2rem;
+}
+
+.summary-card.income {
+  background-color: #4caf50; /* 초록 */
+}
+
+.summary-card.expense {
+  background-color: #f44336; /* 빨강 */
+}
+
+.summary-card.net {
+  background-color: #2196f3; /* 파랑 */
 }
 </style>

@@ -111,8 +111,14 @@ const routes = [
     meta: { requiresAuth: true },
   },
   {
-    path: "/groups/:groupId/new",
-    name: "GroupTransactionForm",
+    path: "/groups/:groupId/transactions/new",
+    name: "GroupTransactionCreate",
+    component: GroupTransactionForm,
+    meta: { requiresAuth: true },
+  },
+  {
+    path: "/groups/:groupId/transactions/:transactionId/edit",
+    name: "GroupTransactionEdit",
     component: GroupTransactionForm,
     meta: { requiresAuth: true },
   },
