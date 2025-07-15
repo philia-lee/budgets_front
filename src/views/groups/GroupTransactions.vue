@@ -160,9 +160,9 @@
             <div v-if="showInviteForm" class="invite-form">
               <div class="invite-input-group">
                 <input
-                  v-model="inviteEmail"
-                  type="email"
-                  placeholder="초대할 이메일 주소"
+                  v-model="inviteNickName"
+                  type="text"
+                  placeholder="닉네임을 입력하세요"
                   class="invite-input"
                 />
                 <button @click="inviteMember" class="send-invite-btn">
@@ -284,7 +284,7 @@ export default {
     const showDeleteConfirm = ref(false);
     const editingGroupName = ref(false);
     const newGroupName = ref("");
-    const inviteEmail = ref("");
+    const inviteNickName = ref("");
 
     const fetchTransactions = async () => {
       loading.value = true;
@@ -422,16 +422,41 @@ export default {
     };
 
     const inviteMember = async () => {
-      if (!inviteEmail.value.trim()) {
-        alert("이메일을 입력해주세요.");
+      if (!inviteNickName.value.trim()) {
+        alert("닉네임을 입력해주세요.");
+        return;
+      }
+
+      let targetUser = null;
+
+      try {
+        // 닉네임으로 유저 조회
+        const result = await groupMemberApi.getUserByNickname(
+          groupId, // 👈 여기 추가
+          inviteNickName.value
+        );
+        targetUser = result;
+        console.log("유저 조회 결과:", targetUser);
+      } catch (err) {
+        alert("유저를 찾을 수 없습니다.");
+        return; // 유저 없으면 초대 진행 안 함
+      }
+
+      if (!targetUser) {
+        alert("해당 닉네임을 가진 유저가 없습니다.");
         return;
       }
 
       try {
-        const result = await groupApi.inviteMember(groupId, inviteEmail.value);
+        // 유저의 id를 사용해 초대
+        const result = await groupMemberApi.inviteMember(
+          groupId,
+          targetUser.id
+        );
+        console.log(result);
         if (result === "success") {
-          alert("초대가 전송되었습니다.");
-          inviteEmail.value = "";
+          alert("초대가 완료되었습니다.");
+          inviteNickName.value = "";
           showInviteForm.value = false;
         } else {
           alert("초대 전송에 실패했습니다: " + result);
@@ -439,12 +464,15 @@ export default {
       } catch (err) {
         alert("서버 오류가 발생했습니다.");
       }
+
+      // 멤버 목록 다시 불러오기
+      await fetchGroupMembers();
     };
 
     const removeMember = async (userId) => {
       if (confirm("정말로 이 멤버를 강퇴하시겠습니까?")) {
         try {
-          const result = await groupApi.removeMember(groupId, userId);
+          const result = await groupMemberApi.removeMember(groupId, userId);
           if (result === "success") {
             members.value = members.value.filter((m) => m.userId !== userId);
             alert("멤버가 강퇴되었습니다.");
@@ -502,7 +530,7 @@ export default {
       showDeleteConfirm,
       editingGroupName,
       newGroupName,
-      inviteEmail,
+      inviteNickName,
       updateGroupName,
       cancelEditName,
       inviteMember,

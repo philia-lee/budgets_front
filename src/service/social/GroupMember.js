@@ -40,4 +40,18 @@ export default {
       return null;
     }
   },
+
+  // 닉네임으로 유저 찾기
+  async getUserByNickname(groupId, nickname) {
+    try {
+      const response = await axiosInstance.get(
+        `/api/groups/${groupId}/members/nickname`,
+        { params: { nickname } }
+      );
+      return response.data; // User의 id, nickname
+    } catch (err) {
+      console.error(err.response?.data?.message);
+      return null;
+    }
+  },
 };
